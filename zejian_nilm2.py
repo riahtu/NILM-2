@@ -50,11 +50,17 @@ def find_close_zero(data, start_index, direction):
     # 断言输入的index不能为0，为零就没有意义了
     assert data[start_index] != 0, \
         'find close zero, data at %r is already zero' % (start_index)
+    original_start_index=start_index
     while data[start_index] != 0:
         start_index = start_index + direction * pd.Timedelta(seconds=1)
         # 数据点中有些缺失，这样跳过来增强鲁棒性。 TODO: A robuster algorithm to handle data loss
         while not data.index.contains(start_index):
             start_index = start_index + direction * pd.Timedelta(seconds=1)
+            # bug fix, 超出边界了以后就用原来的
+            if direction > 0 and start_index > data.index[-1]:
+                return original_start_index
+            elif direction < 0 and start_index < data.index[0]:
+                return original_start_index
     return start_index
 
 
@@ -62,11 +68,16 @@ def find_close_zero(data, start_index, direction):
 def skip_zeros(data, start_index, direction):
     assert data[start_index] == 0, \
         'skip zeros, data at %r is not zero' % (start_index)
+    original_start_index = start_index
     while data[start_index] == 0:
         start_index = start_index + direction * pd.Timedelta(seconds=1)
         # 数据点中有些缺失，这样跳过来增强鲁棒性。 TODO: A robuster algorithm to handle data loss
         while not data.index.contains(start_index):
             start_index = start_index + direction * pd.Timedelta(seconds=1)
+            if direction > 0 and start_index > data.index[-1]:
+                return original_start_index
+            elif direction < 0 and start_index < data.index[0]:
+                return original_start_index
     return start_index
 
 
