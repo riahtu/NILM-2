@@ -51,7 +51,7 @@ for j in range(2, 200):
     # 保存到buffer
     mains_buffer = mains_buffer.append(mains_activ).index.drop_duplicates()
     mains_buffer_reactiv = mains_buffer.append(mains_reactiv).index.drop_duplicates()
-    #buffer 满了再检测
+    #buffer 满了再检测d
     if mains_buffer.size > buffer_size:
         # event detection 和 active/ reactive power 计算
         on_event_active, off_event_active = zz.get_activation(mains_buffer)
