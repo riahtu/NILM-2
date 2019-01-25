@@ -40,7 +40,7 @@ buffer_size = 60 * 60  # buffer_size is one hour
 # 保存测试结果文件
 f_on = open('res/test_app_on.txt', 'w')
 f_off = open('res/test_app_off.txt', 'w')
-for j in range(2, 200):
+for j in range(2, 800):
     for i in APPLIANCES:
         #print(elec[i].available_columns())
         mains_activ += next(elec[i].load(ac_type='active'))['power', 'active'].fillna(0)[tspan[0]:tspan[1]]
@@ -48,10 +48,13 @@ for j in range(2, 200):
     # 如果遇到丢掉的数据就用前后来非零来代替 TODO: fix it with a better algorithm to handle package loss
     mains_activ=mains_activ.fillna(method='ffill')
     mains_reactiv=mains_reactiv.fillna(method='ffill')
-    # 保存到buffer
-    mains_buffer = mains_buffer.append(mains_activ).index.drop_duplicates()
-    mains_buffer_reactiv = mains_buffer.append(mains_reactiv).index.drop_duplicates()
-    #buffer 满了再检测d
+    # 保存到buffer and remove duplicates
+    mains_buffer = mains_buffer.append(mains_activ)
+    mains_buffer = mains_buffer[~mains_buffer.index.duplicated()]
+    mains_buffer_reactiv = mains_buffer_reactiv.append(mains_reactiv)
+    mains_buffer_reactiv = mains_buffer_reactiv[~mains_buffer_reactiv.index.duplicated()]
+
+    # buffer 满了再检测
     if mains_buffer.size > buffer_size:
         # event detection 和 active/ reactive power 计算
         on_event_active, off_event_active = zz.get_activation(mains_buffer)
