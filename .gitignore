@@ -1,2 +1,4 @@
 data/
 __pycache__/
+GUI/nilm/*.autosave
+GUI/nilm/*.user

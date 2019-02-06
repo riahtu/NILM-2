@@ -31,7 +31,7 @@ start_time = next(elec['fridge'].load(ac_type='active'))['power', 'active'].inde
 delay_time = '0 days 00:01:00'
 tspan=[start_time, start_time + pd.Timedelta(delay_time)]
 # 读入神经网络 PNN
-pnn = pickle.load(open('params/pnn.txt', "rb")) # re
+pnn = pickle.load(open('params/pnn.txt', "rb"))
 
 #创建一个buffer
 mains_buffer = pd.Series([])
@@ -93,7 +93,7 @@ for j in range(2, 1600):
         on_event_reactive, off_event_reactive = zz.get_others(mains_buffer_reactiv, on_in, off_in)
         #zz.plot_event(mains['computer active power'], events['computer active on'], events['computer active off'])
 
-        # do prediction cc
+        # do prediction
         if len(on_event_active) != 0:
             appliance_on = zz.predict_appliance(pnn, on_event_active, on_event_reactive)
         if len(off_event_active) != 0:
