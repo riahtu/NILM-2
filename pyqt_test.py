@@ -1,6 +1,6 @@
 import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QDialog, QWidget, QMainWindow, QGridLayout, QSizePolicy
+from PyQt5.QtWidgets import QApplication, QDialog, QWidget, QMainWindow, QGridLayout
 from PyQt5.QtCore import QThread, pyqtSignal, QDateTime
 import pickle
 from typing import Dict, Any
@@ -10,41 +10,34 @@ import zejian_nilm2 as zz
 import time
 import matplotlib
 matplotlib.use("Qt5Agg")  # 声明使用QT5
-import numpy as np
-from matplotlib.backends.qt_compat import QtCore, QtWidgets, is_pyqt5
-if is_pyqt5():
-    from matplotlib.backends.backend_qt5agg import (
-        FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
-else:
-    from matplotlib.backends.backend_qt4agg import (
-        FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 # pyuic5 -x mainwindow.ui -o mainwindow.py
 # zejianData\Box Sync\power\simulation\NILM
 
-class PlotCanvas(FigureCanvas):
-
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot(111)
-
-        FigureCanvas.__init__(self, fig)
-        self.setParent(parent)
-
-        FigureCanvas.setSizePolicy(self,
-                                   QSizePolicy.Expanding,
-                                   QSizePolicy.Expanding)
-        FigureCanvas.updateGeometry(self)
-        self.plot()
-
-    def plot(self):
-        data = [random.random() for i in range(25)]
-        ax = self.figure.add_subplot(111)
-        ax.plot(data, 'r-')
-        ax.set_title('PyQt Matplotlib Example')
-        self.draw()
+#创建一个matplotlib图形绘制类
+class MyFigure(FigureCanvas):
+    def __init__(self, width=5, height=4, dpi=100):
+        # 第一步：创建一个创建Figure
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        # 第二步：在父类中激活Figure窗口
+        super(MyFigure,self).__init__(self.fig) #此句必不可少，否则不能显示图形
+        # 第三步：创建一个子图，用于绘制图形用，111表示子图编号，如matlab的subplot(1,1,1)
+        self.axes = self.fig.add_subplot(111)
+    #第四步：就是画图，【可以在此类中画，也可以在其它类中画】
+    def plotsin(self):
+        self.axes0 = self.fig.add_subplot(111)
+        t = np.arange(0.0, 3.0, 0.01)
+        s = np.sin(2 * np.pi * t)
+        self.axes0.plot(t, s)
+    def plotcos(self):
+        t = np.arange(0.0, 3.0, 0.01)
+        s = np.sin(2 * np.pi * t)
+        self.axes.plot(t, s)
 
 
 
@@ -119,7 +112,7 @@ def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
     global plotter
     active_power, reactive_power = get_buffer()
     #plotter.plot_power(active_power)
-    #plotter_containner.plotcos()
+    plotter_containner.plotcos()
     #plotter_trigger.emit()
     flag_event = False
 
@@ -156,7 +149,7 @@ def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
             elif appliance_on[k] == 1:
                 on_event = str(on_event_active.index[k]) + '  cloth iron on'
             on_event_trigger.emit(on_event)
-            time.sleep(2)
+            #time.sleep(2)
 
     if len(off_event_active) != 0:
         for k in range(appliance_off.size):
@@ -169,7 +162,7 @@ def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
             elif appliance_off[k] == 1:
                 off_event = str(off_event_active.index[k]) + '  cloth iron off'
             off_event_trigger.emit(off_event)
-            time.sleep(2)
+            #time.sleep(2)
             #self.junk_printer.append(off_event)
 
     # ui.predicted_appliance.setText(data)
@@ -190,7 +183,7 @@ class WorkThread(QThread):
 
 
 # main window class
-class Ui_MainWindow(QtWidgets.QMainWindow):
+class Ui_MainWindow(QtGui.QDialog):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(675, 465)
@@ -202,6 +195,9 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.predicted_appliance = QtWidgets.QLabel(self.centralWidget)
         self.predicted_appliance.setGeometry(QtCore.QRect(10, 20, 371, 21))
         self.predicted_appliance.setObjectName("predicted_appliance")
+        self.plotter = QtWidgets.QGroupBox(self.centralWidget)
+        self.plotter.setGeometry(QtCore.QRect(10, 50, 641, 351))
+        self.plotter.setObjectName("plotter")
         MainWindow.setCentralWidget(self.centralWidget)
         self.menuBar = QtWidgets.QMenuBar(MainWindow)
         self.menuBar.setGeometry(QtCore.QRect(0, 0, 675, 23))
@@ -214,13 +210,12 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.statusBar.setObjectName("statusBar")
         MainWindow.setStatusBar(self.statusBar)
 
-        dynamic_canvas = FigureCanvas(Figure(figsize=(5, 3)))
-        self.addToolBar(QtCore.Qt.BottomToolBarArea,
-                        NavigationToolbar(dynamic_canvas, self))
-
-        self._static_ax = dynamic_canvas.figure.subplots()
-        t = np.linspace(0, 10, 501)
-        self._static_ax.plot(t, np.tan(t), ".")
+        # 第五步：定义MyFigure类的一个实例
+        # 绘图器
+        plotter_containner = MyFigure(width=3, height=2, dpi=100)
+        plotter_containner.plotsin()
+        self.gridlayout = QGridLayout(self.plotter)
+        self.gridlayout.addWidget(plotter_containner, 0, 1)
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -234,15 +229,14 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
 
     def write_on(self, in_data):
         self.predicted_appliance.setText(in_data)
-        self.plotter_containner.plotcos()
-        self.plotter.update()
         print('in_on')
+        self.plotter.update()
+        a=0
 
     def write_off(self, in_data):
         self.real_appliances.setText(in_data)
-        self.plotter_containner.plotcos()
-        self.plotter.update()
         print('in_off')
+        self.plotter.update()
 
     # 定义画图器来画active power
     def plot_power(self, data):
@@ -252,12 +246,11 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.axes.plot(t, s)
         #self.plotter.
 
-    def _update_canvas(self):
-        self._dynamic_ax.clear()
-        t = np.linspace(0, 10, 101)
-        # Shift the sinusoid as a function of time.
-        self._dynamic_ax.plot(t, np.sin(t + time.time()))
-        self._dynamic_ax.figure.canvas.draw()
+    def plotcos(self):
+        t = np.arange(0.0, 3.0, 0.01)
+        s = np.sin(2 * np.pi * t)
+        self.axes.plot(t, s)
+        self.gridlayout.addWidget(F1, 0, 1)
 
 
 if __name__ == "__main__":
