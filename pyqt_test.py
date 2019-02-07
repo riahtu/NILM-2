@@ -36,7 +36,7 @@ class MyFigure(FigureCanvas):
         self.axes0.plot(t, s)
     def plotcos(self):
         t = np.arange(0.0, 3.0, 0.01)
-        s = np.sin(2 * np.pi * t)
+        s = np.cos(2 * np.pi * t)
         self.axes.plot(t, s)
 
 
@@ -112,7 +112,7 @@ def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
     global plotter
     active_power, reactive_power = get_buffer()
     #plotter.plot_power(active_power)
-    plotter_containner.plotcos()
+    #plotter_containner.plotcos()
     #plotter_trigger.emit()
     flag_event = False
 
@@ -149,7 +149,7 @@ def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
             elif appliance_on[k] == 1:
                 on_event = str(on_event_active.index[k]) + '  cloth iron on'
             on_event_trigger.emit(on_event)
-            #time.sleep(2)
+            time.sleep(2)
 
     if len(off_event_active) != 0:
         for k in range(appliance_off.size):
@@ -162,7 +162,7 @@ def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
             elif appliance_off[k] == 1:
                 off_event = str(off_event_active.index[k]) + '  cloth iron off'
             off_event_trigger.emit(off_event)
-            #time.sleep(2)
+            time.sleep(2)
             #self.junk_printer.append(off_event)
 
     # ui.predicted_appliance.setText(data)
@@ -183,7 +183,7 @@ class WorkThread(QThread):
 
 
 # main window class
-class Ui_MainWindow(QtGui.QDialog):
+class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(675, 465)
@@ -212,10 +212,10 @@ class Ui_MainWindow(QtGui.QDialog):
 
         # 第五步：定义MyFigure类的一个实例
         # 绘图器
-        plotter_containner = MyFigure(width=3, height=2, dpi=100)
-        plotter_containner.plotsin()
+        self.plotter_containner = MyFigure(width=3, height=2, dpi=100)
+        self.plotter_containner.plotsin()
         self.gridlayout = QGridLayout(self.plotter)
-        self.gridlayout.addWidget(plotter_containner, 0, 1)
+        self.gridlayout.addWidget(self.plotter_containner, 0, 1)
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -229,14 +229,15 @@ class Ui_MainWindow(QtGui.QDialog):
 
     def write_on(self, in_data):
         self.predicted_appliance.setText(in_data)
-        print('in_on')
+        self.plotter_containner.plotcos()
         self.plotter.update()
-        a=0
+        print('in_on')
 
     def write_off(self, in_data):
         self.real_appliances.setText(in_data)
-        print('in_off')
+        self.plotter_containner.plotcos()
         self.plotter.update()
+        print('in_off')
 
     # 定义画图器来画active power
     def plot_power(self, data):
@@ -246,11 +247,7 @@ class Ui_MainWindow(QtGui.QDialog):
         self.axes.plot(t, s)
         #self.plotter.
 
-    def plotcos(self):
-        t = np.arange(0.0, 3.0, 0.01)
-        s = np.sin(2 * np.pi * t)
-        self.axes.plot(t, s)
-        self.gridlayout.addWidget(F1, 0, 1)
+
 
 
 if __name__ == "__main__":
