@@ -28,16 +28,25 @@ class MyFigure(FigureCanvas):
         super(MyFigure,self).__init__(self.fig) #此句必不可少，否则不能显示图形
         # 第三步：创建一个子图，用于绘制图形用，111表示子图编号，如matlab的subplot(1,1,1)
         self.axes = self.fig.add_subplot(111)
-    #第四步：就是画图，【可以在此类中画，也可以在其它类中画】
+    # debug plot
     def plotsin(self):
         self.axes0 = self.fig.add_subplot(111)
+        self.axes0.clear()
         t = np.arange(0.0, 3.0, 0.01)
         s = np.sin(2 * np.pi * t)
         self.axes0.plot(t, s)
+        self.draw()
     def plotcos(self):
+        self.axes.clear()
         t = np.arange(0.0, 3.0, 0.01)
-        s = np.sin(2 * np.pi * t)
+        s = np.cos(2 * np.pi * t)
         self.axes.plot(t, s)
+        self.draw()
+    # debug plot
+    def plotpp(self, tp):
+        self.axes.clear()
+        self.axes.plot(active_power.values)
+        self.draw()
 
 
 
@@ -69,12 +78,14 @@ activ_off_list = [start_time]
 
 #创建一个buffer
 buffer_size = 1 * 20 * 60  # buffer_size is 10 mins
+active_power=0
 
+plotter_containner = MyFigure(width=3, height=2, dpi=100)
 
 # fill buffer
 def get_buffer():
     global APPLIANCES
-    global mains_activ, tspan, mains_buffer_reactiv
+    global mains_activ, tspan, mains_buffer_reactiv, start_time
 
     # 创建一个buffer
     mains_buffer = pd.Series([])
@@ -102,17 +113,22 @@ def get_buffer():
             mains_buffer = mains_buffer.drop(mains_buffer.index[0:mains_buffer.size - buffer_size])
             mains_buffer_reactiv = mains_buffer_reactiv.drop(
                 mains_buffer_reactiv.index[0:mains_buffer_reactiv.size - buffer_size])
-
+            # 增加时间
+            start_time = start_time + (j - 1) * pd.Timedelta(delay_time)
             return mains_buffer, mains_buffer_reactiv
         # 增加时间
         tspan = [start_time + (j - 1) * pd.Timedelta(delay_time), start_time + j * pd.Timedelta(delay_time)]
         # time.sleep(1)
 
 def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
-    global plotter
+    global active_power, plotter_containner
     active_power, reactive_power = get_buffer()
     #plotter.plot_power(active_power)
-    plotter_containner.plotcos()
+    #plotter_containner.plot_power(active_power)
+    #plotter_trigger.emit()
+    # plotter_containner.axes.clear()
+    # plotter_containner.axes.plot(active_power.values)
+    # plotter_containner.axes.draw()
     #plotter_trigger.emit()
     flag_event = False
 
@@ -149,7 +165,7 @@ def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
             elif appliance_on[k] == 1:
                 on_event = str(on_event_active.index[k]) + '  cloth iron on'
             on_event_trigger.emit(on_event)
-            #time.sleep(2)
+            time.sleep(1)
 
     if len(off_event_active) != 0:
         for k in range(appliance_off.size):
@@ -162,11 +178,8 @@ def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
             elif appliance_off[k] == 1:
                 off_event = str(off_event_active.index[k]) + '  cloth iron off'
             off_event_trigger.emit(off_event)
-            #time.sleep(2)
+            time.sleep(1)
             #self.junk_printer.append(off_event)
-
-    # ui.predicted_appliance.setText(data)
-    # ui.real_appliances.setText(data)
 
 
 class WorkThread(QThread):
@@ -183,8 +196,9 @@ class WorkThread(QThread):
 
 
 # main window class
-class Ui_MainWindow(QtGui.QDialog):
+class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
+        global plotter_containner
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(675, 465)
         self.centralWidget = QtWidgets.QWidget(MainWindow)
@@ -211,9 +225,8 @@ class Ui_MainWindow(QtGui.QDialog):
         MainWindow.setStatusBar(self.statusBar)
 
         # 第五步：定义MyFigure类的一个实例
-        # 绘图器
-        plotter_containner = MyFigure(width=3, height=2, dpi=100)
-        plotter_containner.plotsin()
+
+
         self.gridlayout = QGridLayout(self.plotter)
         self.gridlayout.addWidget(plotter_containner, 0, 1)
 
@@ -229,28 +242,19 @@ class Ui_MainWindow(QtGui.QDialog):
 
     def write_on(self, in_data):
         self.predicted_appliance.setText(in_data)
+        plotter_containner.plotpp(1)
         print('in_on')
-        self.plotter.update()
-        a=0
 
     def write_off(self, in_data):
         self.real_appliances.setText(in_data)
+        plotter_containner.plotpp(2)
         print('in_off')
-        self.plotter.update()
 
-    # 定义画图器来画active power
-    def plot_power(self, data):
-        #plotter.axes.plot(data.values)
-        t = np.arange(0.0, 3.0, 0.01)
-        s = np.sin(2 * np.pi * t)
-        self.axes.plot(t, s)
-        #self.plotter.
+    def plot_power(self):
+        plotter_containner.plotpp(3)
 
-    def plotcos(self):
-        t = np.arange(0.0, 3.0, 0.01)
-        s = np.sin(2 * np.pi * t)
-        self.axes.plot(t, s)
-        self.gridlayout.addWidget(F1, 0, 1)
+
+
 
 
 if __name__ == "__main__":
@@ -266,7 +270,7 @@ if __name__ == "__main__":
 
     work.off_event_trigger.connect(ui.write_off)
     work.on_event_trigger.connect(ui.write_on)
-    #work.plotter_trigger.connect(ui.plot_power)
+    work.plotter_trigger.connect(ui.plot_power)
 
     work.start()
     window.show()
