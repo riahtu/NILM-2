@@ -86,18 +86,91 @@ plotter_containner = MyFigure(width=3, height=2, dpi=100)
 # this is used for restarting the work thread
 flag_restart = False
 
-# fill buffer
-def get_buffer():
-    global APPLIANCES
-    global mains_activ, tspan, mains_buffer_reactiv, start_time
 
-    # 创建一个buffer
-    mains_buffer = pd.Series([])
-    mains_buffer_reactiv = pd.Series([])
-    for j in range(2, 1600):
-        # 检测是否需要再读入buffer
-        if flag_restart:
-            break
+class WorkThread(QThread):
+    on_event_trigger = pyqtSignal(str)
+    off_event_trigger = pyqtSignal(str)
+    plotter_trigger = pyqtSignal()
+    img_change_trigger = pyqtSignal(int)
+    flag_buffer_ready = False
+    current_last_event_on = start_time
+    current_last_event_off = start_time
+    def __int__(self):
+        super(WorkThread, self).__init__()
+        self.flag = True # thread stop flag
+
+    def run(self):
+        self.flag = True
+        while self.flag:
+            self.detect_appliances(self.on_event_trigger, self.off_event_trigger, self.plotter_trigger)
+        print('work thread closed')
+
+    def stop(self):
+        print("prepare to stop work thread")
+        self.flag = False
+        self.flag_buffer_ready = False
+        print(self.flag)
+
+    # fill buffer
+    def get_buffer(self):
+        global APPLIANCES
+        global mains_activ, tspan, mains_buffer_reactiv, start_time
+
+        # 创建一个buffer
+        mains_buffer = pd.Series([])
+        mains_buffer_reactiv = pd.Series([])
+        for j in range(2, 1600):
+            # 检测是否需要再读入buffer
+            if flag_restart:
+                break
+            # 读入buffer
+            mains_activ = 0
+            mains_reactiv = 0
+            # 这里直接相加有个问题，如果其中一段数据没有的话就会加成NAN
+            for i in APPLIANCES:
+                # print(elec[i].available_columns())
+                if type(mains_activ) == type(0):
+                    mains_temp = mains_activ
+                else:
+                    mains_temp = mains_activ.copy()
+                mains_activ += next(elec[i].load(ac_type='active'))['power', 'active'].fillna(0)[tspan[0]:tspan[1]]
+                adder = -(mains_temp - mains_activ)
+                mains_activ = mains_temp + adder.fillna(0)
+
+                if type(mains_reactiv) == type(0):
+                    mains_temp = mains_reactiv
+                else:
+                    mains_temp = mains_reactiv.copy()
+                mains_reactiv += next(elec[i].load(ac_type='reactive'))['power', 'reactive'].fillna(0)[
+                                 tspan[0]:tspan[1]]
+                adder = -(mains_temp - mains_reactiv)
+                mains_reactiv = mains_temp + adder.fillna(0)
+            # 如果遇到丢掉的数据就用前后来非零来代替 TODO: fix it with a better algorithm to handle package loss
+            mains_activ = mains_activ.fillna(method='ffill')
+            mains_reactiv = mains_reactiv.fillna(method='ffill')
+
+            # 保存到buffer and remove duplicates
+            mains_buffer = mains_buffer.append(mains_activ)
+            mains_buffer = mains_buffer[~mains_buffer.index.duplicated()]
+            mains_buffer_reactiv = mains_buffer_reactiv.append(mains_reactiv)
+            mains_buffer_reactiv = mains_buffer_reactiv[~mains_buffer_reactiv.index.duplicated()]
+
+            # check to see if buffer is ready
+            if mains_buffer.size > buffer_size + 1:
+                mains_buffer = mains_buffer.drop(mains_buffer.index[0:mains_buffer.size - buffer_size])
+                mains_buffer_reactiv = mains_buffer_reactiv.drop(
+                    mains_buffer_reactiv.index[0:mains_buffer_reactiv.size - buffer_size])
+                # 增加时间
+                start_time = start_time + (j - 1) * pd.Timedelta(delay_time)
+                return mains_buffer, mains_buffer_reactiv
+            # 增加时间
+            tspan = [start_time + (j - 1) * pd.Timedelta(delay_time), start_time + j * pd.Timedelta(delay_time)]
+            # time.sleep(1)
+
+    def get_one_reading(self, mains_buffer, mains_buffer_reactiv):
+        global APPLIANCES
+        global tspan, start_time
+
         # 读入buffer
         mains_activ = 0
         mains_reactiv = 0
@@ -116,7 +189,8 @@ def get_buffer():
                 mains_temp = mains_reactiv
             else:
                 mains_temp = mains_reactiv.copy()
-            mains_reactiv += next(elec[i].load(ac_type='reactive'))['power', 'reactive'].fillna(0)[tspan[0]:tspan[1]]
+            mains_reactiv += next(elec[i].load(ac_type='reactive'))['power', 'reactive'].fillna(0)[
+                             tspan[0]:tspan[1]]
             adder = -(mains_temp - mains_reactiv)
             mains_reactiv = mains_temp + adder.fillna(0)
         # 如果遇到丢掉的数据就用前后来非零来代替 TODO: fix it with a better algorithm to handle package loss
@@ -130,97 +204,93 @@ def get_buffer():
         mains_buffer_reactiv = mains_buffer_reactiv[~mains_buffer_reactiv.index.duplicated()]
 
         # check to see if buffer is ready
-        if mains_buffer.size > buffer_size + 1:
-            mains_buffer = mains_buffer.drop(mains_buffer.index[0:mains_buffer.size - buffer_size])
-            mains_buffer_reactiv = mains_buffer_reactiv.drop(
-                mains_buffer_reactiv.index[0:mains_buffer_reactiv.size - buffer_size])
-            # 增加时间
-            start_time = start_time + (j - 1) * pd.Timedelta(delay_time)
-            return mains_buffer, mains_buffer_reactiv
+        mains_buffer = mains_buffer.drop(mains_buffer.index[0:mains_buffer.size-buffer_size])
+        mains_buffer_reactiv = mains_buffer_reactiv.drop(mains_buffer_reactiv.index[0:mains_buffer_reactiv.size-buffer_size])
         # 增加时间
-        tspan = [start_time + (j - 1) * pd.Timedelta(delay_time), start_time + j * pd.Timedelta(delay_time)]
-        # time.sleep(1)
+        start_time = start_time + pd.Timedelta(delay_time)
+        tspan = [start_time, start_time + pd.Timedelta(delay_time)]
+        return mains_buffer, mains_buffer_reactiv
 
-def detect_appliances(on_event_trigger, off_event_trigger, plotter_trigger):
-    global active_power, plotter_containner
-    active_power, reactive_power = get_buffer()
-    #plotter.plot_power(active_power)
-    #plotter_containner.plot_power(active_power)
-    #plotter_trigger.emit()
-    # plotter_containner.axes.clear()
-    # plotter_containner.axes.plot(active_power.values)
-    # plotter_containner.axes.draw()
-    #plotter_trigger.emit()
-    flag_event = False
+    def detect_appliances(self, on_event_trigger, off_event_trigger, plotter_trigger):
+        global active_power, plotter_containner, reactive_power
+        if not self.flag_buffer_ready:
+            active_power, reactive_power = self.get_buffer()
+            self.flag_buffer_ready = True
+        else:
+            active_power, reactive_power = self.get_one_reading(active_power, reactive_power)
 
-    # event detection 和 active/ reactive power 计算
-    on_event_active, off_event_active = zz.get_activation(active_power, window1=50)
-    # 如果没有event就出去重新来，期间保存好这包数据当作buffer
-    if len(on_event_active) == 0 and len(off_event_active) == 0:
-        ui.predicted_appliance.setText(str(tspan[0]) + str(tspan[1]) + 'no event')
+        # plotter.plot_power(active_power)
+        # plotter_containner.plot_power(active_power)
+        # plotter_trigger.emit()
+        # plotter_containner.axes.clear()
+        # plotter_containner.axes.plot(active_power.values)
+        # plotter_containner.axes.draw()
+        plotter_trigger.emit()
+        flag_event = False
 
-    if len(on_event_active) == 0:
-        on_in = []
-    else:
-        on_in = on_event_active.index
-    if len(off_event_active) == 0:
-        off_in = []
-    else:
-        off_in = off_event_active.index
+        # event detection 和 active/ reactive power 计算
+        on_event_active, off_event_active = zz.get_activation(active_power, window1=50)
+        # 如果没有event就出去重新来，期间保存好这包数据当作buffer
+        if len(on_event_active) == 0 and len(off_event_active) == 0:
+            ui.predicted_appliance.setText(str(tspan[0]) + str(tspan[1]) + 'no event')
 
-    on_event_reactive, off_event_reactive = zz.get_others(reactive_power, on_in, off_in)
+        if len(on_event_active) == 0:
+            on_in = []
+        else:
+            on_in = on_event_active.index
+        if len(off_event_active) == 0:
+            off_in = []
+        else:
+            off_in = off_event_active.index
 
-    # do prediction
-    if len(on_event_active) != 0:
-        appliance_on = zz.predict_appliance(pnn, on_event_active, on_event_reactive)
-    if len(off_event_active) != 0:
-        appliance_off = zz.predict_appliance(pnn, off_event_active, off_event_reactive, flag_off=True)
-    if len(on_event_active) != 0:
-        for k in range(appliance_on.size):
-            # 对照以往的activation，得到现在的activation
-            activ_on_list.append(on_event_active.index[k])
-            if appliance_on[k] == 0:
-                on_event = str(on_event_active.index[k]) + '  fridge on'
-            elif appliance_on[k] == 2:
-                on_event = str(on_event_active.index[k]) + '  computer on'
-            elif appliance_on[k] == 1:
-                on_event = str(on_event_active.index[k]) + '  cloth iron on'
-            on_event_trigger.emit(on_event)
-            time.sleep(1)
+        on_event_reactive, off_event_reactive = zz.get_others(reactive_power, on_in, off_in)
 
-    if len(off_event_active) != 0:
-        for k in range(appliance_off.size):
-            # 对照以往的activation，得到现在的activation
-            activ_off_list.append(off_event_active.index[k])
-            if appliance_off[k] == 0:
-                off_event = str(off_event_active.index[k]) + '  fridge off'
-            elif appliance_off[k] == 2:
-                off_event = str(off_event_active.index[k]) + '  computer off'
-            elif appliance_off[k] == 1:
-                off_event = str(off_event_active.index[k]) + '  cloth iron off'
-            off_event_trigger.emit(off_event)
-            time.sleep(1)
-            #self.junk_printer.append(off_event)
+        # do prediction
+        if len(on_event_active) != 0:
+            appliance_on = zz.predict_appliance(pnn, on_event_active, on_event_reactive)
+        if len(off_event_active) != 0:
+            appliance_off = zz.predict_appliance(pnn, off_event_active, off_event_reactive, flag_off=True)
+        if len(on_event_active) != 0:
+            for k in range(appliance_on.size):
+                # 对照以往的activation，得到现在的activation
+                activ_on_list.append(on_event_active.index[k])
+                if appliance_on[k] == 0:
+                    on_event = str(on_event_active.index[k]) + '  fridge on'
+                elif appliance_on[k] == 2:
+                    on_event = str(on_event_active.index[k]) + '  computer on'
+                elif appliance_on[k] == 1:
+                    on_event = str(on_event_active.index[k]) + '  cloth iron on'
+                # check if this is the latest event
+                if on_event_active.index[k] > self.current_last_event_on:
+                    self.current_last_event_on = on_event_active.index[k]
+                    on_event_trigger.emit(on_event)
+                    if appliance_on[k] == 0:
+                        self.img_change_trigger.emit(11)
+                    elif appliance_on[k] == 2:
+                        self.img_change_trigger.emit(21)
+                    time.sleep(1)
 
-
-class WorkThread(QThread):
-    on_event_trigger = pyqtSignal(str)
-    off_event_trigger = pyqtSignal(str)
-    plotter_trigger = pyqtSignal()
-    def __int__(self):
-        super(WorkThread, self).__init__()
-        self.flag = True # thread stop flag
-
-    def run(self):
-        self.flag = True
-        while self.flag:
-            detect_appliances(self.on_event_trigger, self.off_event_trigger, self.plotter_trigger)
-        print('work thread closed')
-
-    def stop(self):
-        print("prepare to stop work thread")
-        self.flag = False
-        print(self.flag)
+        if len(off_event_active) != 0:
+            for k in range(appliance_off.size):
+                # 对照以往的activation，得到现在的activation
+                activ_off_list.append(off_event_active.index[k])
+                if appliance_off[k] == 0:
+                    off_event = str(off_event_active.index[k]) + '  fridge off'
+                elif appliance_off[k] == 2:
+                    off_event = str(off_event_active.index[k]) + '  computer off'
+                elif appliance_off[k] == 1:
+                    off_event = str(off_event_active.index[k]) + '  cloth iron off'
+                # check if this is the latest event
+                if off_event_active.index[k] > self.current_last_event_off:
+                    self.current_last_event_off = off_event_active.index[k]
+                    off_event_trigger.emit(off_event)
+                    if appliance_off[k] == 0:
+                        self.img_change_trigger.emit(10)
+                    elif appliance_off[k] == 2:
+                        self.img_change_trigger.emit(20)
+                    time.sleep(1)
+                # self.junk_printer.append(off_event)
+        time.sleep(0.2)
 
 # main window class
 class Ui_MainWindow(object):
@@ -256,6 +326,18 @@ class Ui_MainWindow(object):
         self.button_stop = QtWidgets.QPushButton(self.centralWidget)
         self.button_stop.setGeometry(QtCore.QRect(330, 40, 41, 23))
         self.button_stop.setObjectName("button_stop")
+        self.fridge = QtWidgets.QLabel(self.centralWidget)
+        self.fridge.setGeometry(QtCore.QRect(310, 70, 121, 91))
+        self.fridge.setObjectName("fridge")
+        self.computer = QtWidgets.QLabel(self.centralWidget)
+        self.computer.setGeometry(QtCore.QRect(480, 70, 131, 91))
+        self.computer.setObjectName("computer")
+        self.fridge_sta = QtWidgets.QLabel(self.centralWidget)
+        self.fridge_sta.setGeometry(QtCore.QRect(310, 170, 91, 31))
+        self.fridge_sta.setObjectName("fridge_sta")
+        self.computer_sta = QtWidgets.QLabel(self.centralWidget)
+        self.computer_sta.setGeometry(QtCore.QRect(480, 170, 91, 31))
+        self.computer_sta.setObjectName("computer_sta")
         MainWindow.setCentralWidget(self.centralWidget)
         self.menuBar = QtWidgets.QMenuBar(MainWindow)
         self.menuBar.setGeometry(QtCore.QRect(0, 0, 644, 23))
@@ -284,11 +366,21 @@ class Ui_MainWindow(object):
         self.button_stop.setText('Stop')
         self.plotter.setTitle("Active power plot")
 
+        self.img_fridge = QtGui.QPixmap('resource/fridge.jpg')
+        self.fridge.setPixmap(self.img_fridge)
+        self.img_computer = QtGui.QPixmap('resource/computer.jpeg')
+        self.computer.setPixmap(self.img_computer)
+        self.img_on = QtGui.QPixmap('resource/on.png')
+        self.img_off = QtGui.QPixmap('resource/off.jpg')
+        self.fridge_sta.setPixmap(self.img_off)
+        self.computer_sta.setPixmap(self.img_off)
+
         self.work = WorkThread()
 
         self.work.off_event_trigger.connect(self.write_off)
         self.work.on_event_trigger.connect(self.write_on)
         self.work.plotter_trigger.connect(self.plot_power)
+        self.work.img_change_trigger.connect(self.change_appliance_sta)
 
         # 信号槽定义
         self.button_start.clicked.connect(self.start_work)
@@ -298,13 +390,13 @@ class Ui_MainWindow(object):
     def write_on(self, in_data):
         # self.predicted_appliance.setText(in_data)
         self.activate_display.append(in_data)
-        plotter_containner.plotpp(1)
+        #plotter_containner.plotpp(1)
         print('in_on')
 
     def write_off(self, in_data):
         # self.real_appliances.setText(in_data)
         self.activate_display.append(in_data)
-        plotter_containner.plotpp(2)
+        #plotter_containner.plotpp(2)
         print('in_off')
 
     def plot_power(self):
@@ -328,6 +420,16 @@ class Ui_MainWindow(object):
     def stop_work(self):
         #self.stop_thread_trigger.emit()
         self.work.stop()
+
+    def change_appliance_sta(self, in_data):
+        if in_data == 10:
+            self.fridge_sta.setPixmap(self.img_off)
+        elif in_data == 11:
+            self.fridge_sta.setPixmap(self.img_on)
+        elif in_data == 20:
+            self.computer_sta.setPixmap(self.img_off)
+        elif in_data == 20:
+            self.computer_sta.setPixmap(self.img_on)
 
 
 if __name__ == "__main__":
