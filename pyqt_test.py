@@ -17,7 +17,8 @@ import numpy as np
 
 
 # pyuic5 -x mainwindow.ui -o mainwindow.py
-# zejianData\Box Sync\power\simulation\NILM
+# zejianData\Box Sync\power\simulation\NILM\GUI\nilm
+# lab_stuff\Box Sync\power\simulation\NILM\GUI\nilm
 
 #创建一个matplotlib图形绘制类
 class MyFigure(FigureCanvas):
@@ -82,6 +83,9 @@ active_power=0
 
 plotter_containner = MyFigure(width=3, height=2, dpi=100)
 
+# this is used for restarting the work thread
+flag_restart = False
+
 # fill buffer
 def get_buffer():
     global APPLIANCES
@@ -91,13 +95,30 @@ def get_buffer():
     mains_buffer = pd.Series([])
     mains_buffer_reactiv = pd.Series([])
     for j in range(2, 1600):
+        # 检测是否需要再读入buffer
+        if flag_restart:
+            break
         # 读入buffer
         mains_activ = 0
         mains_reactiv = 0
+        # 这里直接相加有个问题，如果其中一段数据没有的话就会加成NAN
         for i in APPLIANCES:
             # print(elec[i].available_columns())
+            if type(mains_activ) == type(0):
+                mains_temp = mains_activ
+            else:
+                mains_temp = mains_activ.copy()
             mains_activ += next(elec[i].load(ac_type='active'))['power', 'active'].fillna(0)[tspan[0]:tspan[1]]
+            adder = -(mains_temp - mains_activ)
+            mains_activ = mains_temp + adder.fillna(0)
+
+            if type(mains_reactiv) == type(0):
+                mains_temp = mains_reactiv
+            else:
+                mains_temp = mains_reactiv.copy()
             mains_reactiv += next(elec[i].load(ac_type='reactive'))['power', 'reactive'].fillna(0)[tspan[0]:tspan[1]]
+            adder = -(mains_temp - mains_reactiv)
+            mains_reactiv = mains_temp + adder.fillna(0)
         # 如果遇到丢掉的数据就用前后来非零来代替 TODO: fix it with a better algorithm to handle package loss
         mains_activ = mains_activ.fillna(method='ffill')
         mains_reactiv = mains_reactiv.fillna(method='ffill')
@@ -188,33 +209,56 @@ class WorkThread(QThread):
     plotter_trigger = pyqtSignal()
     def __int__(self):
         super(WorkThread, self).__init__()
+        self.flag = True # thread stop flag
 
     def run(self):
-        while True:
+        self.flag = True
+        while self.flag:
             detect_appliances(self.on_event_trigger, self.off_event_trigger, self.plotter_trigger)
+        print('work thread closed')
 
-
+    def stop(self):
+        print("prepare to stop work thread")
+        self.flag = False
+        print(self.flag)
 
 # main window class
 class Ui_MainWindow(object):
+    stop_thread_trigger = pyqtSignal()
     def setupUi(self, MainWindow):
-        global plotter_containner
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(675, 465)
+        MainWindow.resize(644, 445)
         self.centralWidget = QtWidgets.QWidget(MainWindow)
         self.centralWidget.setObjectName("centralWidget")
-        self.real_appliances = QtWidgets.QLabel(self.centralWidget)
-        self.real_appliances.setGeometry(QtCore.QRect(10, 0, 361, 21))
-        self.real_appliances.setObjectName("real_appliances")
-        self.predicted_appliance = QtWidgets.QLabel(self.centralWidget)
-        self.predicted_appliance.setGeometry(QtCore.QRect(10, 20, 371, 21))
-        self.predicted_appliance.setObjectName("predicted_appliance")
+        self.fix_time_interval = QtWidgets.QLabel(self.centralWidget)
+        self.fix_time_interval.setGeometry(QtCore.QRect(10, 10, 361, 21))
+        self.fix_time_interval.setObjectName("fix_time_interval")
+        self.start_time = QtWidgets.QDateEdit(self.centralWidget)
+        self.start_time.setGeometry(QtCore.QRect(10, 40, 110, 22))
+        self.start_time.setDateTime(QtCore.QDateTime(QtCore.QDate(2013, 6, 20), QtCore.QTime(0, 0, 0)))
+        self.start_time.setObjectName("start_time")
+        self.fix_to = QtWidgets.QLabel(self.centralWidget)
+        self.fix_to.setGeometry(QtCore.QRect(130, 40, 21, 21))
+        self.fix_to.setObjectName("fix_to")
+        self.end_time = QtWidgets.QDateEdit(self.centralWidget)
+        self.end_time.setGeometry(QtCore.QRect(150, 40, 110, 22))
+        self.end_time.setDateTime(QtCore.QDateTime(QtCore.QDate(2013, 6, 21), QtCore.QTime(0, 0, 0)))
+        self.end_time.setObjectName("end_time")
+        self.button_start = QtWidgets.QPushButton(self.centralWidget)
+        self.button_start.setGeometry(QtCore.QRect(280, 40, 41, 23))
+        self.button_start.setObjectName("button_start")
         self.plotter = QtWidgets.QGroupBox(self.centralWidget)
-        self.plotter.setGeometry(QtCore.QRect(10, 50, 641, 351))
+        self.plotter.setGeometry(QtCore.QRect(0, 210, 631, 171))
         self.plotter.setObjectName("plotter")
+        self.activate_display = QtWidgets.QTextBrowser(self.centralWidget)
+        self.activate_display.setGeometry(QtCore.QRect(5, 70, 271, 131))
+        self.activate_display.setObjectName("activate_display")
+        self.button_stop = QtWidgets.QPushButton(self.centralWidget)
+        self.button_stop.setGeometry(QtCore.QRect(330, 40, 41, 23))
+        self.button_stop.setObjectName("button_stop")
         MainWindow.setCentralWidget(self.centralWidget)
         self.menuBar = QtWidgets.QMenuBar(MainWindow)
-        self.menuBar.setGeometry(QtCore.QRect(0, 0, 675, 23))
+        self.menuBar.setGeometry(QtCore.QRect(0, 0, 644, 23))
         self.menuBar.setObjectName("menuBar")
         MainWindow.setMenuBar(self.menuBar)
         self.mainToolBar = QtWidgets.QToolBar(MainWindow)
@@ -224,9 +268,8 @@ class Ui_MainWindow(object):
         self.statusBar.setObjectName("statusBar")
         MainWindow.setStatusBar(self.statusBar)
 
+
         # 第五步：定义MyFigure类的一个实例
-
-
         self.gridlayout = QGridLayout(self.plotter)
         self.gridlayout.addWidget(plotter_containner, 0, 1)
 
@@ -234,27 +277,57 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.real_appliances.setText(_translate("MainWindow", "TextLabel"))
-        self.predicted_appliance.setText(_translate("MainWindow", "TextLabel"))
-        self.plotter.setTitle(_translate("MainWindow", "GroupBox"))
+        MainWindow.setWindowTitle("NILMTK demo")
+        self.fix_time_interval.setText("Select usage time interval   2013/6/20 - 2013/6/30")
+        self.fix_to.setText("to")
+        self.button_start.setText("Start")
+        self.button_stop.setText('Stop')
+        self.plotter.setTitle("Active power plot")
+
+        self.work = WorkThread()
+
+        self.work.off_event_trigger.connect(self.write_off)
+        self.work.on_event_trigger.connect(self.write_on)
+        self.work.plotter_trigger.connect(self.plot_power)
+
+        # 信号槽定义
+        self.button_start.clicked.connect(self.start_work)
+        self.button_stop.clicked.connect(self.stop_work)
+        #self.stop_thread_trigger.connect(self.work.stop)
 
     def write_on(self, in_data):
-        self.predicted_appliance.setText(in_data)
+        # self.predicted_appliance.setText(in_data)
+        self.activate_display.append(in_data)
         plotter_containner.plotpp(1)
         print('in_on')
 
     def write_off(self, in_data):
-        self.real_appliances.setText(in_data)
+        # self.real_appliances.setText(in_data)
+        self.activate_display.append(in_data)
         plotter_containner.plotpp(2)
         print('in_off')
 
     def plot_power(self):
         plotter_containner.plotpp(3)
 
+    def start_work(self):
+        global tspan, start_time, delay_time, elec
+        start_str_time= "{0}{1}{2}{3}{4}".format(str(self.start_time.date().month()), '-', str(self.start_time.date().day()),
+                                           '-', str(self.start_time.date().year()))
+        end_str_time = "{0}{1}{2}{3}{4}".format(str(self.end_time.date().month()), '-', str(self.end_time.date().day()),
+                                            '-', str(self.end_time.date().year()))
+        iawe.set_window(start=start_str_time, end=end_str_time)
+        elec = iawe.buildings[1].elec
+        # 定义想要检测的用电器
+        start_time = next(elec['fridge'].load(ac_type='active'))['power', 'active'].index[0]
+        delay_time = '0 days 00:01:00'
+        tspan = [start_time, start_time + pd.Timedelta(delay_time)]
 
+        self.work.start()
 
+    def stop_work(self):
+        #self.stop_thread_trigger.emit()
+        self.work.stop()
 
 
 if __name__ == "__main__":
@@ -262,16 +335,5 @@ if __name__ == "__main__":
     window = QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(window)
-    work = WorkThread()
-    # test label
-    ui.predicted_appliance.setText('pig')
-    ui.real_appliances.setText('shit')
-    # test label
-
-    work.off_event_trigger.connect(ui.write_off)
-    work.on_event_trigger.connect(ui.write_on)
-    work.plotter_trigger.connect(ui.plot_power)
-
-    work.start()
     window.show()
     sys.exit(app.exec_())

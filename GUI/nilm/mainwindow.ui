@@ -6,51 +6,127 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>675</width>
-    <height>465</height>
+    <width>644</width>
+    <height>445</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <widget class="QLabel" name="real_appliances">
+   <widget class="QLabel" name="fix_time_interval">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>0</y>
+      <y>10</y>
       <width>361</width>
       <height>21</height>
      </rect>
     </property>
     <property name="text">
-     <string>TextLabel</string>
+     <string>Select usage time interval   2013/6/20 - 2013/6/30</string>
     </property>
    </widget>
-   <widget class="QLabel" name="predicted_appliance">
+   <widget class="QDateEdit" name="start_time">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>20</y>
-      <width>371</width>
+      <y>40</y>
+      <width>110</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="dateTime">
+     <datetime>
+      <hour>0</hour>
+      <minute>0</minute>
+      <second>0</second>
+      <year>2013</year>
+      <month>6</month>
+      <day>20</day>
+     </datetime>
+    </property>
+   </widget>
+   <widget class="QLabel" name="fix_to">
+    <property name="geometry">
+     <rect>
+      <x>130</x>
+      <y>40</y>
+      <width>21</width>
       <height>21</height>
      </rect>
     </property>
     <property name="text">
-     <string>TextLabel</string>
+     <string>to</string>
+    </property>
+   </widget>
+   <widget class="QDateEdit" name="end_time">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>40</y>
+      <width>110</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="dateTime">
+     <datetime>
+      <hour>0</hour>
+      <minute>0</minute>
+      <second>0</second>
+      <year>2013</year>
+      <month>6</month>
+      <day>21</day>
+     </datetime>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="button_start">
+    <property name="geometry">
+     <rect>
+      <x>280</x>
+      <y>40</y>
+      <width>41</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Start</string>
     </property>
    </widget>
    <widget class="QGroupBox" name="plotter">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>50</y>
-      <width>641</width>
-      <height>351</height>
+      <x>0</x>
+      <y>210</y>
+      <width>631</width>
+      <height>171</height>
      </rect>
     </property>
     <property name="title">
-     <string>GroupBox</string>
+     <string>Active power plot</string>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="activate_display">
+    <property name="geometry">
+     <rect>
+      <x>5</x>
+      <y>70</y>
+      <width>271</width>
+      <height>131</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="button_stop">
+    <property name="geometry">
+     <rect>
+      <x>330</x>
+      <y>40</y>
+      <width>41</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Stop</string>
     </property>
    </widget>
   </widget>
@@ -59,7 +135,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>675</width>
+     <width>644</width>
      <height>23</height>
     </rect>
    </property>
