@@ -1,5 +1,6 @@
 # Non-intrusive load monitoring project 
 This is a non-intrusive load monitoring (NILM) project for GEIRINA. PNN classification algorithm is used. 
+
 ##Required software installation (Windows)
 Install Anaconda https://docs.anaconda.com/anaconda/install/windows/
 
