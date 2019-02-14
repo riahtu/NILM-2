@@ -19,3 +19,23 @@ Install pickle to read in trained PNN
 pip install pickle
 ``
 
+Install pyqt5
+
+``conda install -c dsdale24 pyqt5``
+
+Download iawe dataset https://www.iiitd.edu.in/~nipunb/iawe/iawe.h5
+
+Create a directory named 'data' in 'NILM' directory and copy 'iawe.h5' into 'NILM/data'
+
+## Run the program
+Open Anaconda Prompt, switch to nilmtk-env environment
+
+``activate nilmtk-env``
+
+Change directory to your NILM directory (cloned file)
+
+``cd YOUR_OWN_DIRECTORY``
+
+Run the python script
+
+``python pyqt_test.py``
