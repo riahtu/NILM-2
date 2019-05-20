@@ -18,7 +18,7 @@ import zejian_nilm2 as zz
 
 iawe = DataSet('data/iawe.h5')
 # fridge和computer的数据从7-01开始不能用了， 7-20 开始好了，后面都不能用，21号能用一天
-iawe.set_window(start='6-20-2013', end='6-21-2013')
+iawe.set_window(start='6-20-2013', end='7-01-2013')
 elec = iawe.buildings[1].elec
 
 # 做一个合成的数据
@@ -39,6 +39,11 @@ mains_buffer_reactiv = pd.Series([])
 buffer_size = 1 * 30 * 60  # buffer_size is one hour
 buffer_ready = False
 
+cc=next(elec['fridge'].load(ac_type='active'))['power', 'active'].fillna(0)
+cc.to_csv('fridge.csv')
+dd=next(elec['computer'].load(ac_type='active'))['power', 'active'].fillna(0)
+dd.to_csv('computer.csv')
+
 # 保存测试结果文件
 f_on = open('res/test_app_on.txt', 'w')
 f_off = open('res/test_app_off.txt', 'w')
@@ -47,7 +52,7 @@ f_off = open('res/test_app_off.txt', 'w')
 activ_on_list = [start_time]
 activ_off_list = [start_time]
 
-for j in range(2, 1600):
+for j in range(2, 20000):
     for i in APPLIANCES:
         #print(elec[i].available_columns())
         mains_activ += next(elec[i].load(ac_type='active'))['power', 'active'].fillna(0)[tspan[0]:tspan[1]]

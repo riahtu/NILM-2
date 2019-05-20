@@ -58,20 +58,17 @@ iawe.set_window(start='6-20-2013', end='6-21-2013')
 elec = iawe.buildings[1].elec
 # 定义想要检测的用电器
 APPLIANCES = ['fridge', 'computer']
+# APPLIANCES = ['fridge']
 start_time = next(elec['fridge'].load(ac_type='active'))['power', 'active'].index[0]
 delay_time = '0 days 00:01:00'
 tspan = [start_time, start_time + pd.Timedelta(delay_time)]
 
-
-# 做一个合成的数据
-APPLIANCES = ['fridge', 'computer']
-events: Dict[Any, Any] = {}
-mains: Dict[Any, Any] = {}
-start_time = next(elec['fridge'].load(ac_type='active'))['power', 'active'].index[0]
-delay_time = '0 days 00:01:00'
-tspan = [start_time, start_time + pd.Timedelta(delay_time)]
 # 读入神经网络 PNN
 pnn = pickle.load(open('params/pnn.txt', "rb"))
+
+# 保存结果
+f_on = open('res/detect_app_on.txt', 'w')
+f_off = open('res/detect_app_off.txt', 'w')
 
 # 保存activation num
 activ_on_list = [start_time]
@@ -106,10 +103,13 @@ class WorkThread(QThread):
         print('work thread closed')
 
     def stop(self):
+        global f_off, f_on
         print("prepare to stop work thread")
         self.flag = False
         self.flag_buffer_ready = False
         print(self.flag)
+        f_off.close()
+        f_on.close()
 
     # fill buffer
     def get_buffer(self):
@@ -263,12 +263,13 @@ class WorkThread(QThread):
                 # check if this is the latest event
                 if on_event_active.index[k] > self.current_last_event_on:
                     self.current_last_event_on = on_event_active.index[k]
+                    print(on_event, file=f_on)
                     on_event_trigger.emit(on_event)
                     if appliance_on[k] == 0:
                         self.img_change_trigger.emit(11)
                     elif appliance_on[k] == 2:
                         self.img_change_trigger.emit(21)
-                    time.sleep(1)
+                    time.sleep(0.2)
 
         if len(off_event_active) != 0:
             for k in range(appliance_off.size):
@@ -284,11 +285,12 @@ class WorkThread(QThread):
                 if off_event_active.index[k] > self.current_last_event_off:
                     self.current_last_event_off = off_event_active.index[k]
                     off_event_trigger.emit(off_event)
+                    print(off_event, file=f_off)
                     if appliance_off[k] == 0:
                         self.img_change_trigger.emit(10)
                     elif appliance_off[k] == 2:
                         self.img_change_trigger.emit(20)
-                    time.sleep(1)
+                    time.sleep(0.2)
                 # self.junk_printer.append(off_event)
         time.sleep(0.2)
 

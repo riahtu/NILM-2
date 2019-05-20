@@ -28,10 +28,13 @@ APPLIANCES = ['fridge', 'computer']
 fridge = elec['fridge']
 computer = elec['computer']
 
-computer.plot()
+# computer.plot()
 
 fridge_activ = fridge.get_activations(on_power_threshold=40)
 computer_activ = computer.get_activations(on_power_threshold=20)
+
+# pickle.dump(fridge_activ, open('params/fridge_activ.txt', 'wb'))
+# pickle.dump(computer_activ, open('params/computer_activ.txt', 'wb'))
 
 for i in fridge_activ:
     print(i.index[0], 'fridge on', file=f_on)
@@ -40,6 +43,6 @@ for i in computer_activ:
     print(i.index[0], 'computer on', file=f_on)
     print(i.index[-1], 'computer off', file=f_off)
 
-plt.show()
+# plt.show()
 f_off.close()
 f_on.close()
