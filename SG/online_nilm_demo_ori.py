@@ -13,7 +13,14 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     # print(msg.topic+" "+msg.payload.decode("utf-8","ignore"))
-    main_algorithm(json.loads(msg.payload.decode("utf-8","ignore")))
+    # main_algorithm(json.loads(msg.payload.decode("utf-8","ignore")))
+    # message = json.loads(msg.payload.decode("utf-8","ignore"))
+    #
+    # print(message['active'], message['current'], message['pf'])
+    print(msg.payload)
+
+def on_log(client, userdata, level, buf):
+    print("log: ", buf)
 
 
 def main_algorithm(message):
@@ -119,7 +126,9 @@ if __name__ == "__main__":
     client = paho.Client("raspberrypi")
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect("127.0.0.1", 1883, 60)  ## The edge broker
+    # client.on_log = on_log
+    # client.connect("127.0.0.1", 1883, 60)  ## The edge broker
+    client.connect("192.168.191.1", 1883, 60)  ## The edge broker
     # 读入神经网络 PNN
     pnn = pickle.load(open('params/pnn.txt', "rb"))
     # 创建一个buffer
@@ -141,5 +150,5 @@ if __name__ == "__main__":
     activ_off_list = [start_time]
 
     # Start
-    client.subscribe('nilm')
+    client.subscribe('data')
     client.loop_forever()
