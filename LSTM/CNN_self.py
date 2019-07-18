@@ -11,25 +11,38 @@ import zz_CNN as zz
 from keras.utils import plot_model
 # 全局变量
 batch_size = 128
-nb_classes = 13
+nb_classes = 2
 epochs = 100
 # input image dimensions
-img_rows, img_cols = 6, 50
+img_rows, img_cols = 4, int(2*60)
 # number of convolutional filters to use
 nb_filters = 50
 # size of pooling area for max pooling
 pool_size = 2
 # convolution kernel size
-kernel_size = 3
+kernel_size = 2
+# define directory
+dir = '../data/self_made_data/'
+currentApp = 'class7'
 
-#prep data
-XTrain, YTrain, XTest, YTest = zz.prep_data('../data/self_made_data/P_data.csv',
-                                                    '../data/self_made_data/I_data.csv',
-                                                    '../data/self_made_data/DP_data.csv',
-                                                    '../data/self_made_data/PF_data.csv',
-                                                    '../data/self_made_data/DI_data.csv',
-                                                    '../data/self_made_data/U_data.csv',
-                                                    '../data/self_made_data/target_data.csv', trainRate=0.8)
+#prep data, no transfer learning
+# XTrain, YTrain, XTest, YTest = zz.prep_data('../data/self_made_data/P_data.csv',
+#                                                     '../data/self_made_data/I_data.csv',
+#                                                     '../data/self_made_data/DP_data.csv',
+#                                                     '../data/self_made_data/PF_data.csv',
+#                                                     '../data/self_made_data/DI_data.csv',
+#                                                     '../data/self_made_data/U_data.csv',
+#                                                     '../data/self_made_data/target_data.csv', trainRate=0.8)
+#prep data, transfer learning
+XTrain, YTrain, XTest, YTest = zz.prep_data_trans(P=dir+currentApp+'/P_data.csv',
+                                                    I=dir+currentApp+'/I_data.csv',
+                                                    DP=-1,
+                                                    PF=dir+currentApp+'/PF_data.csv',
+                                                    DI=-1,
+                                                    U=dir+currentApp+'/U_data.csv',
+                                                    R=dir+currentApp+'/R_data.csv',
+                                                    Target=dir+currentApp+'/target_data.csv', trainRate=0.8)
+
 
 # 根据不同的backend定下不同的格式
 XTrain = XTrain.reshape(XTrain.shape[0], img_rows, img_cols)
@@ -83,4 +96,5 @@ model.fit(XTrain, YTrain, batch_size=batch_size, epochs=epochs,
 score = model.evaluate(XTest, YTest, verbose=0)
 print('Test score:', score[0])
 print('Test accuracy:', score[1])
-model.save('model.h5')
+# model.save('model_trans_water_heater.h5')
+model.save('model_trans'+currentApp+'.h5')

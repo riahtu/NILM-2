@@ -471,3 +471,188 @@ def get_events_cnn(thisBuffer, net, pnnDic):
             else:
                 return np.array([applianceNum, 1, 1])
         return np.array([applianceNum, event[0, eventInd]*probCNN, eventInd])
+
+def get_events_cnn_trans(thisBuffer, net, pnnDic):
+    # repack the buffer and remove 0 s
+    # thisBuffer = np.maximum(thisBuffer, 0.01)
+    this_event = []
+
+    mains_buffer_P = thisBuffer[0, :].copy()
+    mains_buffer_I = thisBuffer[1, :].copy()
+    mains_buffer_U = thisBuffer[2, :].copy()
+    mains_buffer_P_norm = mains_buffer_P / np.max(thisBuffer[0, :])
+    mains_buffer_I_norm = mains_buffer_I / np.max(thisBuffer[1, :])
+    mains_buffer_U_norm = mains_buffer_U / np.max(thisBuffer[2, :])
+
+    mains_buffer_S = np.multiply(mains_buffer_U, mains_buffer_I)
+    mains_buffer_S = np.maximum(mains_buffer_S, 0.01)
+    mains_buffer_PF = np.minimum(np.divide(mains_buffer_P, mains_buffer_S), 1)
+
+    maxInd = np.argmax(mains_buffer_P)
+    minInd = np.argmin(mains_buffer_P)
+    deltaP = (max(mains_buffer_P) - min(mains_buffer_P)) * np.sign(maxInd - minInd)
+    mains_buffer_DP = np.full(mains_buffer_P.shape, abs(deltaP))
+
+    maxIndI = np.argmax(mains_buffer_I)
+    minIndI = np.argmin(mains_buffer_I)
+    deltaI = (max(mains_buffer_I) - min(mains_buffer_I)) * np.sign(maxIndI - minIndI)
+    mains_buffer_DI = np.full(mains_buffer_I.shape, abs(deltaI))
+
+
+    allData = np.concatenate(([mains_buffer_P_norm], [mains_buffer_I_norm], [mains_buffer_PF],
+                              [mains_buffer_U_norm]),axis=0)
+    allData = allData.reshape(1, allData.shape[0], allData.shape[1])
+    # if abs(max(mains_buffer_P) - min(mains_buffer_I)) <= 100 or (np.var(mains_buffer_P[0:5])<100 and np.var(mains_buffer_P[-6:]) < 100):
+    if abs(deltaP) <= 1 :
+        #no events
+        return "no event", 1
+    else:
+        if len(np.where(mains_buffer_P < 10)[0]) > 10:
+            return "detecting...", -1
+        # classify the appliance
+        predictions = net['computer'].predict(allData)
+        applianceNumComputer = np.argmax(predictions)
+        probComputer = predictions[0, applianceNumComputer]
+
+        predictions = net['heater'].predict(allData)
+        applianceNumHeater = np.argmax(predictions)
+        probHeater = predictions[0, applianceNumHeater]
+
+        if probComputer<0.9 and probHeater<0.9:
+            return "not sure", -1
+        if max(mains_buffer_P) < 20:
+            return "no event", 1
+        elif applianceNumComputer == 0 and applianceNumHeater == 0:
+            if probComputer >= probHeater:
+                this_event = "Computer"
+            elif max(mains_buffer_P) > 300:
+                this_event = "Heater"
+            else:
+                this_event = "Light"
+        elif applianceNumComputer == 0:
+            this_event = "Computer"
+        elif applianceNumHeater == 0:
+            if max(mains_buffer_P) > 300:
+                this_event = "Heater"
+            else:
+                this_event = "Light"
+        else:
+            return "cannot recognize", -1
+
+        if mains_buffer_P[-1] < 10:
+            return this_event+" off", 0.5
+        else:
+            return this_event+" on", 0.5
+
+def get_events_cnn_trans_dbg(thisBuffer, net, pnnDic, previousEvent):
+    # repack the buffer and remove 0 s
+    # thisBuffer = np.maximum(thisBuffer, 0.01)
+    this_event = []
+
+    mains_buffer_P = thisBuffer[0, :].copy()
+    mains_buffer_I = thisBuffer[1, :].copy()
+    mains_buffer_U = thisBuffer[2, :].copy()
+    mains_buffer_P_norm = abs(mains_buffer_P - np.min(thisBuffer[0, :])) / (np.maximum(np.max(thisBuffer[0, :]), 0.01)
+                                                                            - np.min(thisBuffer[0, :]))
+    mains_buffer_I_norm = abs(mains_buffer_I - np.min(thisBuffer[1, :])) / (np.maximum(np.max(thisBuffer[1, :]), 0.01)
+                                                                            - np.min(thisBuffer[1, :]))
+    mains_buffer_U_norm = abs(mains_buffer_U - np.min(thisBuffer[2, :])) / (np.maximum(np.max(thisBuffer[2, :]), 0.01)
+                                                                            - np.min(thisBuffer[0, :]))
+
+    mains_buffer_S = np.multiply(mains_buffer_U, mains_buffer_I)
+    mains_buffer_S = np.maximum(mains_buffer_S, 0.01)
+    mains_buffer_PF = np.minimum(np.divide(mains_buffer_P, mains_buffer_S), 1)
+
+    maxInd = np.argmax(mains_buffer_P)
+    minInd = np.argmin(mains_buffer_P)
+    deltaP = (max(mains_buffer_P) - min(mains_buffer_P)) * np.sign(maxInd - minInd)
+    mains_buffer_DP = np.full(mains_buffer_P.shape, abs(deltaP))
+
+    maxIndI = np.argmax(mains_buffer_I)
+    minIndI = np.argmin(mains_buffer_I)
+    deltaI = (max(mains_buffer_I) - min(mains_buffer_I)) * np.sign(maxIndI - minIndI)
+    mains_buffer_DI = np.full(mains_buffer_I.shape, abs(deltaI))
+
+
+    allData = np.concatenate(([mains_buffer_P_norm], [mains_buffer_I_norm], [mains_buffer_PF],
+                              [mains_buffer_U_norm]), axis=0)
+    allData = allData.reshape(1, allData.shape[0], allData.shape[1])
+    # if abs(max(mains_buffer_P) - min(mains_buffer_I)) <= 100 or (np.var(mains_buffer_P[0:5])<100 and np.var(mains_buffer_P[-6:]) < 100):
+    if abs(deltaP) <= 2:
+        #no events
+        return "no event", 1
+    else:
+        predictions = np.zeros([11, 2])
+        if len(np.where(mains_buffer_P < 10)[0]) > 10:
+            return "hold...", -1
+        predictions[4, :] = net['class5'].predict(allData)
+        # if np.argmax(predictions[4, :]) == 0:
+        #     return 'class5', 0
+        if abs(deltaP) >= 20 and previousEvent != 'class3':
+            # computer explicit, compute the change of power variation speed
+            # pVariance = mains_buffer_P[20:100]
+            # pVariance_norm = (pVariance - np.min(pVariance)) / (np.maximum(np.max(pVariance), 0.01) - np.min(pVariance))
+            # pDiff = np.diff(pVariance_norm) #6
+            pDiff = np.diff(mains_buffer_P_norm)
+            if np.sum(abs(pDiff[20:100])) > 0.6:
+                return 'class5', 0
+            predictions[0, :] = net['class1'].predict(allData)
+            predictions[6, :] = net['class7'].predict(allData)
+            predictions[4, :] = net['class5'].predict(allData)
+            # fridge explicit
+            startPos = maxInd + 2
+            if np.max(mains_buffer_P) - np.mean(mains_buffer_P[startPos:-1]) > 200:
+                return 'class3', 0
+            classNum = 'class'+str(np.argmax(predictions[:, 0])+1)
+            if classNum == 'class1' and mains_buffer_PF[100] < 0.9:
+                classNum = 'class7'
+            return classNum, predictions[np.argmax(predictions[:, 0]), 0]
+        else:
+            return 'hold....', 0
+
+def detail_class(roughClass, thisBuffer, pnnDic, hisDP):
+    mains_buffer_P = thisBuffer[0, :].copy()
+    mains_buffer_I = thisBuffer[1, :].copy()
+    mains_buffer_U = thisBuffer[2, :].copy()
+    maxInd = np.argmax(mains_buffer_P)
+    minInd = np.argmin(mains_buffer_P)
+    deltaP = (max(mains_buffer_P) - min(mains_buffer_P)) * np.sign(maxInd - minInd)
+
+    if roughClass == 'class1':
+        if max(mains_buffer_P) > 300:
+            this_event = "class 1 Heater"
+        else:
+            this_event = "class 1 Light"
+        #get event numbers
+        # events, _, _ = get_activation(mains_buffer_P, mains_buffer_I, mains_buffer_U, window1=3)
+        if (abs(hisDP - deltaP) > 100 and hisDP != 0):
+            this_event = "Hair Dryer"
+
+    elif roughClass == 'class3':
+        this_event = "class 3 Fridge"
+
+    elif roughClass == 'class5':
+        this_event = "class 5 Computer"
+
+    elif roughClass == 'class7':
+        this_event = "class 7 Monitor"
+
+    else:
+        return roughClass, hisDP
+    if mains_buffer_P[-1] < 10:
+        if roughClass == 'class1' and maxInd-minInd>0:
+            return 'off', hisDP
+        hisDP = 0
+        return " off", hisDP
+    else:
+        if hisDP == 0:
+            hisDP = deltaP
+        return this_event + " on", hisDP
+
+class Appliance():
+    def __init__(self, name, p, i, u):
+        self.name = name
+        self.p = p
+        self.i = i
+        self.u = u
+        

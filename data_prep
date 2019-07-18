@@ -1,0 +1,38 @@
+# -*- coding: utf-8 -*-
+"""
+this script can read in the recorded csv file and save them into a h5 file
+@author: Zejian Zhou
+"""
+import h5py
+import numpy as np
+
+data_path = '../data'
+f = h5py.File(data_path+"/all_data2.hdf5", "w")  # get a h5 file
+# format is "app name, directory, 0-self/1-iawe"
+data_path_list = {'laptop1': data_path+'/laptop.csv'+'0',
+                  'light1': data_path+'/light.csv'+'0',
+                  'monitor1': data_path+'/water_heater_on_off.csv'+'0',
+                  'hair_dryer1': data_path + '/hairDryer.csv' + '0',
+                  'fridge1': data_path + '/fridge.csv' + '0',
+                  'fridge2': data_path + '/iawe/electricity/3.csv' + '1',
+                  'vacum1': data_path + '/vacumCleaner.csv' + '0',
+                  'vacum2': data_path + '/vacumCleaner2.csv' + '0',
+                  'microwave1': data_path + '/microwave.csv' + '0',
+                  'laptop2': data_path + '/laptop2.csv' + '0',
+                  }
+for i in data_path_list:
+    this_data_path = data_path_list[i]
+    if this_data_path[-1] == '0':
+        this_data = np.genfromtxt(this_data_path[0:-1], delimiter=',')
+        appliance_group = f.create_group(i)
+        appliance_group['p'], appliance_group['i'], appliance_group['u'] = this_data[:, 2], this_data[:, 1],\
+                                                                           this_data[:, 0]
+    elif this_data_path[-1] == '1':
+        this_data = np.genfromtxt(this_data_path[0:-1], delimiter=',', skip_header=1, max_rows=29999)
+        appliance_group = f.create_group(i)
+        appliance_group['p'], appliance_group['i'], appliance_group['u'] = this_data[:, 1], this_data[:, 7], \
+                                                                           this_data[:, 5]
+        a=0
+    else:
+        raise NameError('ZZ: data path is wrong') #抛出异常
+f.close()

@@ -35,3 +35,37 @@ def prep_data(P,I,DP,PF,DI,U,Target, trainRate=0.8):
             counterTest += 1
 
     return XTrain, YTrain, XTest, YTest
+
+#transfer learning data getter
+def prep_data_trans(P,I,DP,PF,DI,U,R,Target, trainRate=0.8):
+    pDat=genfromtxt(P, delimiter=',')
+    iDat = genfromtxt(I, delimiter=',')
+    pfDat = genfromtxt(PF, delimiter=',')
+    uDat = genfromtxt(U, delimiter=',')
+    tarDat = genfromtxt(Target, delimiter=',')
+    rDat = genfromtxt(R, delimiter=',')
+    row, col = pDat.shape
+    trainSize = round(row*trainRate)
+    XTrain = np.empty([trainSize, 4, col])
+    YTrain = tarDat[0:trainSize, :]
+    XTest = np.empty([row-trainSize, 4, col])
+    YTest = tarDat[trainSize:, :]
+    counterTrain = 0
+    counterTest = 0
+    for i in range(row):
+        if i < trainSize:
+            XTrain[counterTrain, 0, :] = pDat[i, :]
+            XTrain[counterTrain, 1, :] = iDat[i, :]
+            XTrain[counterTrain, 2, :] = pfDat[i, :]
+            XTrain[counterTrain, 3, :] = uDat[i, :]
+            # XTrain[counterTrain, 4, :] = rDat[i, :]
+            counterTrain += 1
+        else:
+            XTest[counterTest, 0, :] = pDat[i, :]
+            XTest[counterTest, 1, :] = iDat[i, :]
+            XTest[counterTest, 2, :] = pfDat[i, :]
+            XTest[counterTest, 3, :] = uDat[i, :]
+            # XTest[counterTest, 4, :] = rDat[i, :]
+            counterTest += 1
+
+    return XTrain, YTrain, XTest, YTest

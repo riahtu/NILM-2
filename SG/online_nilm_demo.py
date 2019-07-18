@@ -148,7 +148,7 @@ if __name__ == "__main__":
     client = paho.Client("raspberrypi")
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect("192.168.191.1", 1883, 60)  ## The edge broker
+    # client.connect("192.168.191.1", 1883, 60)  ## The edge broker
     # 读入神经网络 PNN
     pnn = pickle.load(open('../params/pnn.txt', "rb"))
     # 创建一个buffer
